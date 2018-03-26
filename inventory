@@ -1,0 +1,1 @@
+znc.omgren.com ansible_user=fedora ansible_ssh_private_key=~/.ssh/aws7.pem ansible_python_interpreter=/usr/bin/python3

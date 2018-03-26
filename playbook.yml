@@ -1,0 +1,69 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+  tasks:
+
+# install znc stuff
+#
+    - name: Install 'znc'
+      dnf:
+        name: znc
+        state: latest
+
+    - name: Install 'pexpect' for znc makeconfig
+      pip:
+        name: pexpect
+
+    - name: Configure znc defaults
+      become_user: znc
+      expect:
+        command: znc -nc
+        creates: /var/lib/znc/.znc
+        echo: True
+        responses:
+          '\[ \?\? \] Listen on port \(1025 to 65534\): ': "6697\n"
+          '\[ \?\? \] Listen using SSL \(yes/no\) \[no\]: ': "yes\n"
+          '\[ \?\? \] Listen using both IPv4 and IPv6 \(yes/no\) \[yes\]: ': "yes\n"
+          '\[ \?\? \] Username \(alphanumeric\): ': admin
+          '\[ \?\? \] Enter password': password
+          '\[ \?\? \] Confirm password': password
+          '\[ \?\? \] Nick': ''
+          '\[ \?\? \] Alternate nick': ''
+          '\[ \?\? \] Ident': ''
+          '\[ \?\? \] Real name': ''
+          '\[ \?\? \] Bind host': ''
+          '\[ \?\? \] Set up a network': 'no'
+          '\[ \?\? \] Launch ZNC now': 'no'
+
+    - name: Make sure znc is running
+      systemd: state=started name=znc enabled=True
+
+# let wheel sudo without password and create a user for me to use
+#
+    - name: Make sure we have a 'wheel' group
+      group:
+        name: wheel
+        state: present
+
+    - name: Allow 'wheel' group to have passwordless sudo
+      lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: '^%wheel'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Create 'ren' user
+      user:
+        name: ren
+        groups: wheel
+        append: yes
+        state: present
+        createhome: yes
+
+    - name: Add my ssh key to ren
+      authorized_key:
+        user: ren
+        state: present
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
